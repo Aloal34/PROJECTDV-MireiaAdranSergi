@@ -1,0 +1,1281 @@
+---
+title: "Comprehensive characterization of patient-derived xenograft models"
+author: "Adran Lopez, Sergi Boluda i Mireia Fabregas"
+date: "19/03/2026"
+output:
+  html_document:
+    theme: cosmo
+    highlight: tango
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(kableExtra)
+library(readxl)
+library(tidyr)
+library(ggplot2)
+library(dplyr)
+library(skimr)
+library(ggh4x)
+
+```
+<style>
+  h1.title { color: black; font-weight: bold; }
+  h2 { color: #2780e3; border-bottom: 2px solid #eee; padding-bottom: 5px; margin-top: 30px; }
+  
+  /* Estilo para las líneas divisorias (hr) */
+  hr {
+    border: 0;
+    height: 1px;
+    background: #eee; /* Gris clarito */
+    margin-top: 40px;
+    margin-bottom: 40px;
+  }
+
+  p {
+    text-align: justify;
+    text-justify: inter-word;
+  }
+</style>
+
+
+# **PART A**
+
+## Where and why was the information collected?
+
+
+The information was collected from patient-derived xenograft (PDX) models
+developed by institutions participating in the **NCI Patient-Derived Xenograft
+Development and Trial Centers Research Network (PDXNet)** and the **National
+Cancer Institute Patient-Derived Models Repository (PDMR)**.
+
+
+These models originate from tumor samples donated by cancer patients at
+participating research hospitals and cancer centers. The tumors were implanted
+into mice to create patient-derived xenograft (PDX) models.
+
+Each model is catalogued with information such as:
+
+- PDX model ID  
+- Cancer type  
+- Patient clinical details  
+- Tissue origin  
+- Contributing institution
+
+All of this was done because they wanted to catalog the PDX tumor models used in the study and support genomic analysis and target cancer therapy research. So they wanted to document and organize the full set of PDX models. Also provide transparency and reproducibility so other researchers know exactly which models were analyzed. They wanted to link genomic data to specific tumor models, which then helped to identify models suitable for drug testing and precision cancer research. ANd finally they wanted to create a standardized resource that scientists can reuse for future cancer studies.
+
+ 
+
+## Which is the meaning of each variable?
+
+There are 32 variables in our data describing each PDX model and its sequencing information.
+
+<br>
+
+#### **Patient & Sample Information**
+
+
+```{r data-dictionary-full, echo=FALSE, message=FALSE, warning=FALSE}
+pdx_description <- data.frame(
+  Variable = c("Formal_CaseID", "Gender", "Age", "Race", "Source", 
+               "ModelID_proper_v3", "NCI_Passage", "Original_SampleID", 
+               "Group", "TumorStatus"),
+  Meaning = c(
+    "Is the unique identifier for the patient case from which the tumor sample originated.",
+    "Biological sex of the patient (Female/Male).",
+    "Age of the patient when the tumor sample was collected.",
+    "The patient reported racial background.",
+    "Institution or centre where the PDX model was generated or contributed to.",
+    "Standardized ID for the PDX model used in the dataset.",
+    "Number of passages (times the tumor has been transplanted between mice).<br><br>In PDX models a tumor of a patient is implemented into a mouse. Each transplant is called a passage:<ul><li>Passage 1 (P1) &rarr; First mouse</li><li>Passage 2 (P2) &rarr; Second mouse</li></ul>",
+    "Identifier for the original tumor sample collected from the patient.",
+    "Group classification used in the study dataset.",
+    "Indicates if the tumor sample is primary or metastatic."
+  )
+)
+
+kable(pdx_description, format = "html", escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "bordered")) %>%
+  row_spec(0, bold = TRUE, color = "white", background = "#2780e3") %>%
+  column_spec(1, bold = TRUE, width = "25%", extra_css = "vertical-align: top;") %>%
+  column_spec(2, width = "75%", extra_css = "vertical-align: top;")
+
+```
+
+<br>
+
+#### **Cancer classification**
+
+```{r cancer-classification-table, echo=FALSE, message=FALSE, warning=FALSE}
+cancer_df <- data.frame(
+  Variable = c("CancerGroup", "CancerType", "Diagnosis", "TreatmentPriorToCollection"),
+  Meaning = c(
+    "Category of cancer (e.g., gastrointestinal, breast, lung...).",
+    "Specific type.",
+    "Detailed pathological diagnosis of the tumor.",
+    "Whether the patient received treatment before the tumor sample was collected."
+  )
+)
+
+kable(cancer_df, format = "html", escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "bordered")) %>%
+  row_spec(0, bold = TRUE, color = "white", background = "#2780e3") %>%
+  column_spec(1, bold = TRUE, width = "25%", extra_css = "vertical-align: top;")
+
+```
+<br>
+
+#### **Sequencing data**
+
+```{r sequencing-table, echo=FALSE, message=FALSE, warning=FALSE}
+seq_df <- data.frame(
+  Variable = c("DataType", "Total_reads", "Mapped(%)", "MappedReads (M)", "Duplicates(%)", "AvarageReadsLength(bp)", "MeanMappingQuality", "AvarageInserSize(bp)", "MeanTargetCoverage(MQ20)"),
+  Meaning = c(
+    "Type of genomic data generated (e.g., WES).",
+    "Total number of sequencing reads produced.",
+    "Percentage of reads successfully aligned.",
+    "Number of mapped reads (in millions).",
+    "Percentage of duplicated reads detected.",
+    "Average length of sequencing reads (base pairs).",
+    "Average quality score for read alignment.",
+    "Average DNA fragment size between paired reads.",
+    "Average sequencing coverage of the target region with quality &ge; 20."
+  )
+)
+
+kable(seq_df, format = "html", escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "bordered")) %>%
+  row_spec(0, bold = TRUE, color = "white", background = "#2780e3") %>%
+  column_spec(1, bold = TRUE, width = "30%", extra_css = "vertical-align: top;")
+```
+<br>
+
+#### **Tumor genomic characteristics**
+
+```{r genomic-table, echo=FALSE, message=FALSE, warning=FALSE}
+genomic_df <- data.frame(
+  Variable = c("Purity", "Ploidy", "MSI_Score", "MSI_Tool"),
+  Meaning = c(
+    "Estimated proportion of tumor cells in the sample.",
+    "Number of chromosome sets in the tumor genome.",
+    "Microsatellite instability score (measure of genomic instability).<br><ul><li>Low score &rarr; stable (MSS)</li><li>High score &rarr; instability (MSI)</li></ul>",
+    "Software used to calculate the MSI score."
+  )
+)
+
+kable(genomic_df, format = "html", escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "bordered")) %>%
+  row_spec(0, bold = TRUE, color = "white", background = "#2780e3") %>%
+  column_spec(1, bold = TRUE, width = "25%", extra_css = "vertical-align: top;")
+```
+<br>
+
+#### **Data Management IDs**
+
+```{r management-table, echo=FALSE, message=FALSE, warning=FALSE}
+mgmt_df <- data.frame(
+  Variable = c("Analysis_Group", "Analysis_ID", "SampleInfo_ID", "ModelID_alt"),
+  Meaning = c(
+    "Grouping used for genomic analysis based on data quality and filtering criteria.",
+    "Unique identifier for a specific analysis dataset.",
+    "Identifier linking to additional sample metadata.",
+    "Alternative ID used for the same PDX model."
+  )
+)
+
+kable(mgmt_df, format = "html", escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "bordered")) %>%
+  row_spec(0, bold = TRUE, color = "white", background = "#2780e3") %>%
+  column_spec(1, bold = TRUE, width = "25%", extra_css = "vertical-align: top;")
+```
+
+
+## Do the variables have units? Which one?
+
+Some of the variables have measures of units, while others are categorical. The ones with units are summarized in the table below:
+
+| Variable | Unit / Measurement |
+|:---|:---|
+| **Age** | years |
+| **Total_reads** | number of reads |
+| **MappedReads** | millions of reads |
+| **Mapped(%)** | % |
+| **Duplicates(%)** | % |
+| **AvarageReadsLength(bp)** | base pairs (bp) |
+| **MaximumReadsLength(bp)** | base pairs (bp) |
+| **AvarageInsertSize(bp)** | base pairs (bp) |
+| **MeanTargetCoverage(MQ20)** | sequencing depth (x coverage) |
+| **Purity** | proportion (0-1 or %) |
+| **Ploidy** | copy number |
+| **MSI_Score** | score/index |
+
+<br>
+> **Note:** `NCI_Passage` is recorded as a **count** (number of transplantation events) rather than a physical unit of measurement.
+
+
+
+## Does the data set have a long format?
+
+No, the dataset is not in long format, it is in wide format. Each row represents one observation and each column represents a different variable describing that observation.
+
+----------------------------------------------
+
+
+
+# **PART B**
+
+Our first step involves importing the raw dataset directly from its web source into the R environment. Once the data is loaded, we will perform an initial structural audit to determine if the data is 'tidy' or if it requires reshaping into a long format to facilitate effective visualization.
+
+
+```{r, echo=TRUE}
+
+url <- "https://static-content.springer.com/esm/art%3A10.1038%2Fs41467-021-25177-3/MediaObjects/41467_2021_25177_MOESM5_ESM.xlsx"
+
+download.file(url, destfile = "tableS1.xlsx", mode = "wb")
+
+data <- read_excel("tableS1.xlsx", skip = 1)
+
+# First 6 rows
+kable(head(data), "html") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>%
+  scroll_box(width = "100%", height = "300px") %>%
+row_spec(0, bold = T, color = "white", background = "#2780e3") 
+
+
+# We check the variables format and type and if have NAs
+na_summary <- data.frame(
+  Variable = names(data),
+  Type = sapply(data, class),
+  Missing_Values = sapply(data, function(x) sum(is.na(x)))
+)
+
+
+na_summary %>%
+  kable(
+    col.names = c("Variable Name", "Data Type", "Count of NAs"),
+    caption = "<center><b>Data Structure and Quality Summary</b></center>",
+    row.names = FALSE
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width = F,
+    position = "left"
+  ) %>%
+  row_spec(0, bold = T, color = "white", background = "#2780e3") %>%
+
+
+scroll_box(height = "400px", width = "100%")
+
+
+
+```
+## Data Overview
+As we can see from the summary and by inspecting the `.xlsx` file, there are several issues with the dataset:
+
+- Some variables are stored as strings but should be treated as categorical  
+- Some variables contain `"NA"` or `"Unknown"` as strings → these should be converted to proper `NA` values  
+  - Note: numerical variables already have missing values correctly handled  
+- Some character (`chr`) variables should actually be numerical  
+
+### **Main Concern**
+Although the most concerning issue is the following:
+
+<div style="background-color: #e7f3fe; border-left: 6px solid #2196F3; padding: 15px; margin: 10px 0; border-radius: 5px;">
+  <i>If the study reports **500+ patients**, why does the dataset contain **3000+ rows**?</i>
+</div>
+
+
+This suggests that there may be multiple records per patient or potential duplication issues.
+
+### **Next Steps**
+To better understand this, we will:
+
+- Check unique values in individual variables  
+- Combine variables to identify inconsistencies or duplications  
+
+````{r}
+# We first check the total number of rows in our data
+# nrow(data) --> 3705
+
+# First we check the Patients_ID (how many unique ones there are)
+# length(unique(data$Formal_CaseID)) --> 511 
+
+# We will use dplyr 
+# Then we continue by adding the SampleID -> 2304
+# data %>%
+  # distinct(Formal_CaseID, Original_SampleID) %>%
+  # nrow()
+
+# Then with the Group -> 2304
+# data %>%
+  # distinct(Formal_CaseID, Original_SampleID, Group) %>%
+  # nrow()
+
+# Finally with the DataType -> 3702
+# data %>%
+  # distinct(Formal_CaseID, Original_SampleID, Group, DataType) %>%
+  # nrow()
+
+# After checking all of above we create a data frame with all the information to display it at the html
+hierarchy_check <- data.frame(
+  Level = c("Total Rows in Dataset", "Unique Patient IDs", "Unique Sample IDs", "Unique Patient+Sample+Group+Type"),
+  Count = c(
+    nrow(data), 
+    n_distinct(data$Formal_CaseID),
+    nrow(distinct(data, Formal_CaseID, Original_SampleID)),
+    nrow(distinct(data, Formal_CaseID, Original_SampleID, Group, DataType))
+  )
+)
+
+hierarchy_check %>%
+  kable(col.names = c("Data Level", "Count"), align = "lr") %>%
+  kable_styling(bootstrap_options = c("hover", "condensed"), full_width = F, position = "center") %>%
+  row_spec(0, bold = T, color = "white", background = "#2780e3") %>% # Header-like style for the total
+  row_spec(2, bold = T, color = "#d63031")
+
+
+# We can visualize this with a simple table:
+
+data %>%
+  group_by(Group, DataType) %>%
+  summarise(
+    Patients = n_distinct(Formal_CaseID),
+    Total_Samples = n(),
+    .groups = "drop"
+  ) %>%
+  arrange(Group, desc(Patients)) %>%
+  kable(caption = "<center><b>Sample Distribution by Group and Technology<b><center>") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = T) %>%
+  # Merges the 'Group' cells so it's easier to read
+  collapse_rows(columns = 1, valign = "top") %>% 
+  row_spec(0, bold = T, color = "white", background = "#2780e3")
+
+````
+## Understanding the Dataset Structure
+
+This gives us valuable information which, together with the paper’s explanation, allows us to further understand what's happening.
+
+The study design is as follows:
+
+- A cohort of **500+ cancer patients** was selected  
+- Multiple types of samples were obtained from each patient:
+  - **Human_Normal** → Biopsy of healthy tissue  
+  - **Human_Tumor** → Biopsy of the tumor  
+  - **PDX** → Xenograft of the tumor in mice  
+
+These account for **2304 samples**. The remaining rows arise because:
+
+- The same biological sample was analyzed using different techniques:
+  - **WES** (Whole Exome Sequencing)  
+  - **RNA-Seq**  
+
+This results in multiple rows per sample. 
+
+
+
+### **Implications for the Analysis**
+When performing tumor characterization:
+
+- We should focus on **unique Human_Tumor patients**  
+- Avoid counting duplicated samples coming from different sequencing methods  
+- Optionally include **PDX** samples if the analysis requires it  
+
+
+
+### **Next Step: Sample Classification**
+Now, we will analyze the samples to determine the group to which each observation belongs.
+````{r}
+# Let's see to which groups they belong
+group_summary <- data %>%
+  group_by(Group) %>%
+  summarise(unique_patients = n_distinct(Formal_CaseID)) %>%
+  arrange(desc(unique_patients))
+# The total sum is over 511, so some patients may be in common
+
+# We make it beautiful
+group_summary %>%
+  kable(
+    col.names = c("Experimental Group", "Unique Patient Count"),
+    caption = "<center><b>Distribution of Patients across Groups (Note: Overlaps exist)<b><center>"
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width = F,
+    position = "center"
+  ) %>%
+  # Add a footer to explain the "Oddity" we found
+  footnote(general = paste("Total distinct patients in dataset: 511.",
+                           "The sum here (", sum(group_summary$unique_patients), 
+                           ") is higher because patients appear in multiple groups.")) %>%
+  row_spec(0, bold = T, color = "white", background = "#2780e3")
+
+
+
+# Unique Human_Normal patients
+human_normal <- data %>%
+  filter(Group == "Human_Normal") %>%
+  distinct(Formal_CaseID) %>%
+  pull(Formal_CaseID)
+
+# Unique Human_Tumor patients
+human_tumor <- data %>%
+  filter(Group == "Human_Tumor") %>%
+  distinct(Formal_CaseID) %>%
+  pull(Formal_CaseID)
+
+# Unique PDX patients
+pdx_ids <- data %>%
+  filter(Group == "PDX") %>%
+  distinct(Formal_CaseID) %>%
+  pull(Formal_CaseID)
+
+# Check how many patients are in both (intersections)
+normal_pdx <- intersect(human_normal, pdx_ids) # -> 293
+tumor_pdx <- intersect(human_tumor, pdx_ids) # -> 258
+normal_tumor <- intersect(human_normal, human_tumor) # -> 186
+all_three <- intersect(intersect(human_tumor, human_normal), pdx_ids) # -> 186
+
+
+
+# We create a clean summary of the overlaps
+overlap_summary <- data.frame(
+  Comparison = c("Normal ∩ PDX", "Tumor ∩ PDX", "Normal ∩ Tumor", "In All Three Groups"),
+  Shared_Patients = c(
+    length(intersect(human_normal, pdx_ids)),
+    length(intersect(human_tumor, pdx_ids)),
+    length(intersect(human_normal, human_tumor)),
+    length(all_three)
+  )
+)
+
+overlap_summary %>%
+  kable(caption = "<center><b>Patient Overlap Analysis across Experimental Groups<b><center>", align = "lc") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = F) %>%
+  row_spec(0, bold = T, color = "white", background = "#2780e3") %>% 
+  row_spec(4, bold = T, color = "#d63031") %>% 
+  column_spec(2, bold = T)
+
+````
+## Sample Relationships and Study Focus
+
+From the dataset, we observe the following:
+
+- All **Human_Normal** samples have a corresponding **PDX**  
+- All **Human_Tumor** samples have a corresponding **PDX**  
+- Most **Human_Normal** samples originate from **Human_Tumor** patients  
+
+In other words, this indicates that the main focus of the study is on **PDX models**, which explains the presence of additional **PDX samples** that do not directly correspond to the other groups.
+
+However:
+
+- These extra **PDX samples** are derived from mice  
+- Our primary interest is in **human data**  
+- We also want to avoid duplicated samples  
+
+
+
+### **Analysis Strategy**
+
+To simplify the analysis and avoid inconsistencies:
+
+- For tumor characterization:
+  - We will use only **Human_Tumor** individuals  
+- For comparisons involving PDX:
+  - We will use the **corresponding PDX sample** for each patient  
+
+
+### **Data Cleaning**
+
+After addressing the dataset structure, we can now return to the previously identified issues.
+
+We need to clean the dataset before starting the analysis by:
+
+- Identifying variables containing `"NA"` or `"Unknown"` values  
+- Converting these values into proper `NA`  
+- Ensuring variable types are correctly defined  
+
+To make this process robust and avoid manual errors:
+
+- Instead of reviewing variables one by one  
+- We will apply a function to automatically detect and handle `"NA"` and `"Unknown"` values across all columns  
+```{r}
+# Convert "NA" and "Unknown" strings into NA values 
+for (col in names(data)) {
+  # Only act on character or factor columns 
+  if (is.character(data[[col]])) { 
+    # Replace "Unknown" or "NA" (string) with actual NA 
+    data[[col]][data[[col]] %in% c("Unknown", "NA")] <- NA 
+  }
+}  
+
+# Count the na values
+
+na_counts <- data.frame(
+  Variable = names(data),
+  Missing_Values = sapply(data, function(x) sum(is.na(x)))
+)
+
+# For making the data beautiful
+na_counts %>%
+  kable(col.names = c("Column Name", "Total NAs"), 
+        caption = "<center><b>Missing Value Analysis<center><b>",
+        row.names = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), 
+                full_width = F, 
+                position = "center") %>%
+  row_spec(0, bold = T, color = "white", background = "#2780e3") %>%
+  row_spec(26, bold = T, color = "#d63031") %>%
+  row_spec(27, bold = T, color = "#d63031") %>%
+  row_spec(28, bold = T, color = "#d63031") %>%
+  scroll_box(height = "400px") # Essential for your 32 variables
+
+
+# Convert categorical variables to factors - We manually check that
+# List of variables to convert to factors 
+categorical_vars <- c( "Gender", "Age", "Race", "Source", "ModelID_proper_v3", "NCI_Passage", "Group", "TumorStatus", "CancerGroup", "CancerType", "Diagnosis", "TreatmentPriorToCollection", "DataType", "MSI_Tool", "Analysis_Group" )
+
+for (col in categorical_vars) {
+  data[[col]] <- as.factor(data[[col]]) 
+}
+
+# Convert chr variables to numerical 
+data$Ploidy <- as.numeric(data$Ploidy) 
+data$MSI_Score <- as.numeric(data$MSI_Score) 
+data$Purity <- as.numeric(data$Purity) 
+
+# Now we can visualize our transformed data
+# 1. We create a clean summary data frame of the new structure
+data_structure <- data.frame(
+  Variable = names(data),
+  Class = sapply(data, function(x) paste(class(x), collapse = ", ")),
+  Preview = sapply(data, function(x) {
+    # Get a glimpse of the first few values, truncated for the table
+    vals <- head(na.omit(x), 3)
+    if(length(vals) == 0) return("All NA")
+    paste(vals, collapse = ", ")
+  })
+)
+
+# 2. Render it to make it look good
+data_structure %>%
+  kable(
+    col.names = c("Column Name", "Data Type", "Value Preview (First 3)"),
+    caption = "<center><b>Final Processed Data Structure<b><center>",
+    row.names = FALSE
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+    full_width = TRUE
+  ) %>%
+  row_spec(0, bold = T, color = "white", background = "#2780e3") %>%
+  scroll_box(height = "500px")
+```
+## Variable Selection
+
+We will also create a subset of the dataset, keeping only the variables that contain meaningful biological information for our study.
+
+In particular, we will:
+
+- Remove variables that only contain identifiers or technical labels  
+- Exclude variables that are not relevant for the general analysis  
+- Discard variables that do not provide useful variability  
+
+For example:
+
+- Some genomic-related variables are not required for this analysis  
+- The variable **"Duplicates (%)"** contains only zeros  
+  - Therefore, it does not provide any informative value  
+  - It will be removed, as it does not contribute to exploratory analysis  
+
+
+
+### **Objective**
+
+The goal of this step is to:
+
+- Reduce noise in the dataset  
+- Simplify the analysis  
+- Focus only on variables that provide meaningful insights  
+```{r}
+# Checking unique values in Duplicates(%) variable
+duplicates <- unique(data$`Duplicates(%)`) # We see 0, that is, all values are the same
+
+# List of variables to remove
+remove_vars <- c(
+  "ModelID_proper_v3",
+  "Analysis_ID", 
+  "SampleInfo_ID", 
+  "ModelID_alt",
+  "Duplicates(%)", 
+  "MappedReads(M)",
+  "AverageReadsLength(bp)", 
+  "MaximumReadsLength(bp)", 
+  "AverageInsertSize(bp)"
+)
+
+# Subset by removing the unwanted columns
+data_clean <- data %>% select(-all_of(remove_vars))
+
+# Structure Summary
+data.frame(
+  Variable = names(data_clean),
+  Class = sapply(data_clean, function(x) paste(class(x), collapse = ", "))
+) %>%
+  kable(caption = "<center><b>Cleaned Dataset Structure<center><b>",
+        row.names = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"), full_width = F, position = "left") %>%
+  row_spec(0, bold = T, color = "white", background = "#2780e3") %>%
+  scroll_box(height = "300px")
+
+
+data_clean %>%
+  select(where(is.numeric)) %>%
+  pivot_longer(everything(), names_to = "Variable", values_to = "Value") %>%
+  group_by(Variable) %>%
+  summarise(
+    Min = min(Value, na.rm = TRUE),
+    Mean = round(mean(Value, na.rm = TRUE), 2),
+    Max = max(Value, na.rm = TRUE),
+    NAs = sum(is.na(Value))
+  ) %>%
+  kable(caption = "<center><b>Numerical Variable Summary Statistics<center><b>") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = T) %>%
+  row_spec(0, bold = T, color = "white", background = "#2780e3")
+
+```
+## Quality Control Considerations
+
+From the latest `summary()` output, we can extract several important insights. One of the most relevant aspects for the subsequent exploratory analysis is the **quality of the samples**.
+
+In particular, we want to address the following questions:
+
+1. **Is there a difference between samples analyzed with RNA-Seq and WES?**  
+   - This is important for overall quality control  
+
+2. **Is there a difference in quality between MSI tools (msisensor1 vs msisensor2)?**  
+   - This is relevant for downstream tumor characterization  
+
+
+
+### **Interpretation Strategy**
+
+- If clear differences are observed between methods or tools:
+  - These differences should be considered and potentially highlighted in the analysis  
+- If no substantial differences are found:
+  - We can safely treat the data as comparable across methods  
+
+
+
+### **Key Question**
+
+For example:
+
+<div style="background-color: #e7f3fe; border-left: 6px solid #2196F3; padding: 15px; margin: 10px 0; border-radius: 5px;">
+  <i>If some samples were analyzed only using RNA-Seq, while most were analyzed using WES, can both methods be considered of equal quality?</i>
+</div>
+
+To answer this, we will compare key quality metrics such as:
+
+- Number of reads  
+- Percentage of mapping  
+- Mapping quality  
+
+
+
+### **Objective**
+
+This step is crucial because:
+
+- If both methods show similar quality:
+  - We can treat all samples equally, regardless of their data type  
+- Otherwise:
+  - We may need to account for methodological differences in the analysis  
+
+
+
+## DataType differences
+
+```{r}
+# Select the QC-related variables
+data_plot <- data_clean %>%
+  select(DataType, Total_reads, `Mapped(%)`, MeanMappingQuality, `MeanTargetCoverage(MQ20)`) %>%
+  # Convert to long format for easy comparison
+  pivot_longer(
+    cols = -DataType,
+    names_to = "Metric",
+    values_to = "Value"
+  )
+
+# Boxplots to compare the results
+ggplot(data_plot, aes(x = DataType, y = Value, fill = DataType)) +
+  geom_boxplot(outlier.alpha = 0.3) +
+  facet_wrap(~Metric, scales = "free_y") +
+  theme_minimal() +
+  labs(
+    title = "Comparison of Sequencing Metrics by DataType",
+    x = "DataType",
+    y = "Values",
+    fill = "DataType"
+  ) +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold")
+  )
+```
+
+The graph already reveals several important insights:
+
+- There is no substantial difference between **RNA-Seq** and **WES** samples  
+- The **MQ20** metric is only computed for **WES** samples  
+  - This is expected, as MQ20 is associated with targeted sequencing, which is the basis of WES  
+- There is considerable variability within groups (many outliers)  
+  - However, the central tendencies (boxplots) remain at similar levels across methods  
+
+Overall, these observations suggest that:
+
+- Both sequencing methods show **comparable quality**  
+- Despite variability, there is no clear systematic bias between **RNA-Seq** and **WES**  
+
+
+To further validate these findings, we will:
+
+- Plot each quality variable individually  
+- Apply visualization adjustments to better compare boxplot positions
+```{r}
+# Total_reads -> We apply a log10() transformation to get rid of the "outliers noise".
+ggplot(data_clean, aes(x = DataType, y = log10(Total_reads), fill = DataType)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(
+    title = "Total Reads by DataType",
+    y = "Total Reads (log10)"
+  ) +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none")
+
+# Mapped(%) -> log10 makes no sense, so, even if it's not the most "Statistically accurate" way of viewing this, we will directly limit the y axis from 99.5 - 100 --> Which is already a lot! Still, most of the samples are >99.7% mapped 
+ggplot(data_clean, aes(x = DataType, y = `Mapped(%)`, fill = DataType)) +
+  geom_boxplot() +
+  coord_cartesian(ylim = c(99.5, 100)) +
+  theme_minimal() +
+  labs(
+    title = "Mapped (%) by DataType",
+    y = "Mapped (%)"
+  ) +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none")
+
+# MeanMappingQuality -> Again, applying a log10 transformation wouldn't make much difference, so we will just, again, limit the y axis to clearly see the boxplot
+ggplot(data_clean, aes(x = DataType, y = MeanMappingQuality, fill = DataType)) +
+  geom_boxplot() +
+  coord_cartesian(ylim = c(34, 36)) +
+  theme_minimal() +
+  labs(
+    title = "Mean Mapping Quality by DataType",
+    y = "Mean Mapping Quality"
+  ) +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none")
+
+# MQ20 -> This one does not really have an issue by itself, it's already clear that the MQ20 is only computed in WES
+ggplot(data_clean, aes(x = DataType, y = `MeanTargetCoverage(MQ20)`, fill = DataType)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(
+    title = "Mean Target Coverage (MQ20) by DataType",
+    y = "Coverage (MQ20)"
+  ) +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none")
+```
+
+All in all, all the variables lead us to the same conclusion, which is that there's no much of a difference between RNA-Seq and WES techniques. If any, WES has more variability, but having seen the `summary()` and boxplots, we see a clear similar distribution. Hence, we can assure that the quality of both techniques is excellent.
+
+
+## MSI_Tool differences
+````{r}
+ggplot(data_clean, aes(x = MSI_Score)) +
+  geom_histogram(binwidth = 1, fill = "lightblue", color = "black", na.rm = TRUE) +
+  theme_minimal() +
+  labs(
+    title = "Distribution of MSI Score",
+    x = "MSI Score",
+    y = "Count"
+  ) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+data_msi <- data_clean %>%
+  filter(!is.na(MSI_Score), !is.na(MSI_Tool))
+
+# MSI_Score by MSI_Tool using Boxplots
+ggplot(data_msi, aes(x = MSI_Tool, y = log10(MSI_Score + 1), fill = MSI_Tool)) +
+  geom_boxplot(outlier.alpha = 0.3) +
+  theme_minimal() +
+  labs(
+    title = "MSI Score Comparison by Tool",
+    x = "MSI Tool",
+    y = "MSI Score log10",
+    fill = "MSI Tool"
+  ) +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none")
+````
+
+In the case of the MSI Score we see a small issue at first, which is, like we had with the previous part, that we have many outliers (as clearly seen in the histogram), hence, we can perform a simple log10 transformation for a better visualization.
+
+After doing so, we observe very similar distributions, so we conclude the same as before, for later tumor characterization graphics, we can consider those tumors computed with msisensor 1 and 2 as the same type.
+
+All in all, in both cases we observe scores < 10, so most of the samples have a Low Instability, that is, the tumor has some replication errors (hypermutated, but not that much), just more than a regular cell.
+
+## Ploidy and MSI_Score missing values
+Something we were able to see in the `summary()` was that there were a lot of NAs in Ploidy and MSI_Score. A final question before actually starting the tumor characterization is to find where these NAs come from.
+
+The first idea that we could think is that there may be a relation between Data Type and NAs. Maybe a technique did not take into account the Ploidy and/or the MSI_Score.
+
+We can then plot side by side with histograms the relation between total samples for each test and it's missing values. To do this, we must consider:
+
+- **X-axis:** Metric (e.g., MSI or Ploidy)  
+- **Y-axis:** Counts of samples  
+- **Facets:** Separate plots by **Data Type** using `facet_wrap`  
+- **Fill color:** Distinguish values that are **NA** versus non-missing
+
+To do so, we will do a "long_format Data Frame twice", that is, first we do a Data Frame by the Metric ("smaller comparison") and then by the Data Type ("bigger comparison"). Although we will directly perform a "summary table" for this second case, so we have all the values organized and ready to feed the bar plot.
+
+```{r}
+# Long Format of the Metric
+data_missing <- data_clean %>%
+  pivot_longer(cols = c(MSI_Score, Ploidy),
+               names_to = "Metric",
+               values_to = "Value") %>%
+  mutate(Missing = is.na(Value)) # To take into account the NA value!! Creates a column "Missing" Where we will store either if the values is NA or not
+
+# Long Format Summary Table by Data Type
+summary_missing <- data_missing %>%
+  group_by(DataType, Metric) %>% # We first group DataType and Metric together
+  summarise( # We create a reduced + Simplified table with all the counts for each DataType + Metric + Type
+    MissingCount = sum(Missing), # To sum all NAs into a variable called MissingCount
+    TotalCount = n(),             # To sum all the rows in the group_by done (All rows of the data)
+    .groups = "drop_last"
+    ) %>%
+  pivot_longer(cols = c(MissingCount, TotalCount), # We perform a new long format
+               names_to = "Type",                  # Here we store the type of Count (new column)
+               values_to = "Count")                # Here we store the numerical value (new column)
+
+
+# We use the summary_missing data frame we just created
+summary_missing %>%
+  # We arrange to keep groups together
+  arrange(DataType, Metric, desc(Type)) %>% 
+  kable(
+    col.names = c("Data Category", "Metric Type", "Count Category", "Value"),
+    caption = "<center><b>Detailed Missingness Summary by Data Type<center><b>",
+    align = "lllr" # Left align text, Right align numbers
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width = TRUE
+  ) %>%
+  # This automatically merges the repeating 'DataType' cells for a cleaner look
+  collapse_rows(columns = 1:2, valign = "top") %>% 
+  # Add a background color to the "Total Samples" rows to distinguish them
+  row_spec(which(summary_missing$Type == "TotalCount"), background = "#f9f9f9") %>%
+  # Highlight the header
+  row_spec(0, bold = T, color = "white", background = "#2780e3")
+
+
+
+# Histogram side by side
+ggplot(summary_missing, aes(x = Metric, y = Count, fill = Type)) +
+  geom_bar(stat = "identity", position = "dodge", color = "black") + 
+    # Stat = "identity" because we already computed the Counts in the "Count" column - No need for ggplot to               count the rows
+    # Position dodge so that they do not overlap
+  facet_wrap(~DataType) +
+  scale_fill_manual(values = c("MissingCount" = "tomato", "TotalCount" = "steelblue"),
+                    labels = c("Missing (NA)", "Total Samples")) +
+  theme_minimal() +
+  labs(title = "Missing vs Total Samples per Metric by DataType",
+       x = "Metric",
+       y = "Number of Samples",
+       fill = "Type of Count") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+As we can see, both in the DataFrame of the Summary and the Bar Plot, all the NAs of the Ploidy and MSI_Score come from the RNA-Seq analysis. In other words, the people that analyzed those cancer samples using RNA-Seq did not compute the MSI_Score nor the Ploidy.
+
+But this supposes no problem for our study, as we have shown and concluded before, we can treat all RNA-Seq/WES samples as of the same type, given they have no Quality difference. So even if the RNA-Seq performed no Ploidy or MSI_Score, we can still study the tumor characterization.
+
+If any, we could see if both RNA-Seq and WES samples belong to the same type of CancerType. In other words, quickly check (side by side) if the distribution of CancerType is more or less the same for both Data Types. Which we can check with a simple bar plot and as the plot shows, there's not many differences in distribution.
+
+It's important to also "normalize" the data, as we have more WES samples, we must compare the % to show possible real differences.
+
+````{r}
+# Side-by-side bar plot
+ggplot(data_clean, aes(x = CancerType, fill = DataType)) +
+  geom_bar(position = "dodge") + 
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +  # show as %
+  theme_minimal() +
+  labs(
+    title = "Proportion of Samples per CancerType by DataType",
+    x = "Cancer Type",
+    y = "Percentage of Samples",
+    fill = "DataType"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(hjust = 0.5)
+  )
+````
+
+## Tumors Characterization ## 
+
+We can now freely explore the Data we have but been careful and only take into considerations, the Human_Tumor group unless we want to explore differences between PDX (Xenographs) and Human_Tumor.
+
+In this case we can study the distribution of the variables as they are or make small comparisons (in all cases, data was specified in such a way to eliminate NAs to be computed in the graphs too):
+
+````{r}
+# We first create the Subset for all the following graphs
+data_filtered <- data %>%
+  filter(Group == "Human_Tumor") %>%
+  distinct(Formal_CaseID, .keep_all = TRUE)
+````
+
+
+### **Age Distribution**
+````{r}
+
+ggplot(data_filtered[!is.na(data_filtered$Age), ], aes(x = Age)) +
+  geom_bar(na.rm = TRUE, stat = 'count', fill = "skyblue", color = "black") +
+  theme_minimal() +
+  labs(title = "Age Distribution",
+       x = "Age",
+       y = "Number of Patients")
+````
+
+Quite a normally distributed age centralizing at 65.
+
+---
+
+### **Race Distribution** 
+````{r}
+ggplot(data_filtered[!is.na(data_filtered$Race), ], aes(x = Race, fill = Race)) +
+  geom_bar(color = "black") +
+  theme_minimal() +
+  labs(title = "Race Distribution",
+       x = "Race",
+       y = "Number of Patients")
+````
+
+There's a clear over expression of Caucasian patients over the rest.
+
+---
+
+### **Gender Distribution**
+````{r}
+ggplot(data_filtered[!is.na(data_filtered$Gender), ], aes(x = Gender, fill = Gender)) +
+  geom_bar(color = "black") +
+  theme_minimal() +
+  labs(title = "Gender Distribution",
+       x = "Gender",
+       y = "Number of Patients")
+````
+
+We have equal number of Males and Females in the study.
+
+---
+
+### **Cancer Group Distribution**
+````{r}
+ggplot(data_filtered[!is.na(data_filtered$CancerGroup), ], aes(x = CancerGroup)) +
+  geom_bar(stat = 'count', fill = "lightblue", color = "black") +
+  theme_minimal() +
+  labs(title = "Cancer Group Distribution",
+       x = "Cancer Group",
+       y = "Number of Patients") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+````
+
+Some cancers are more represented than others
+
+---
+
+### **Tumor Status vs Age**
+````{r}
+ggplot(data_filtered[!is.na(data_filtered$TumorStatus) & !is.na(data_filtered$Age), ], 
+       aes(x = TumorStatus, fill = Age)) +
+  geom_bar(position = "dodge", color = "black") +
+  theme_minimal() +
+  labs(title = "Tumor Status vs Age",
+       x = "Tumor Status",
+       y = "Number of Patients") +
+  scale_fill_viridis_d(option = "C") 
+````
+
+Curiously, metastasis patients are more evenly distributed, while primary ones are much more common at older ages.
+
+---
+
+### **Tumor Status vs Cancer Group**
+````{r}
+# In this case is extremely important to first normalize the data or else we can see clear differences just because some types of cancers are more present than others in our data.
+data_ratio <- data_filtered %>%
+  filter(!is.na(TumorStatus) & !is.na(CancerGroup)) %>% # We exclude the NAs
+  group_by(TumorStatus, CancerGroup) %>%                # We group by the variable we want to compare
+  summarise(count = n(), .groups = "drop") %>%          # We count them
+  group_by(TumorStatus) %>%                             # We regroup in TumorStatus
+  mutate(proportion = count / sum(count))               # We add a new column with the normalized proportions
+
+ggplot(data_ratio, aes(x = TumorStatus, y = proportion, fill = CancerGroup)) +
+  geom_bar(stat = "identity", color = "black", position = "dodge") +
+  theme_minimal() +
+  labs(title = "Tumor Status vs Cancer Group (Normalized)",
+       x = "Tumor Status",
+       y = "Proportion of Patients") +
+  scale_fill_viridis_d(option = "C") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+````
+
+Lung Cancer is the most common Primary while the most metastatic ones are Breast and Cervix cancers.
+
+---
+
+### **Tumor Status vs Treatment Prior**
+````{r}
+ggplot(data_filtered[!is.na(data_filtered$TumorStatus) & !is.na(data_filtered$TreatmentPriorToCollection), ],
+       aes(x = TumorStatus, fill = TreatmentPriorToCollection)) +
+  geom_bar(position = "dodge", color = "black") +
+  theme_minimal() +
+  labs(title = "Tumor Status vs Treatment Prior",
+       x = "Tumor Status",
+       y = "Number of Patients")
+````
+
+Interestingly, Metastatic patients are the ones which have gone though more treatment rather than primary patients.
+
+---
+
+### **Tumor Status vs Ploidy** 
+````{r}
+ggplot(data_filtered[!is.na(data_filtered$TumorStatus) & !is.na(data_filtered$Ploidy), ],
+       aes(x = TumorStatus, y = Ploidy, fill = TumorStatus)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Tumor Status vs Ploidy",
+       x = "Tumor Status",
+       y = "Ploidy")
+````
+
+It is not surprising to see how, those "more dangerous" forms of cancer, in this case, Metastasis, have the most Ploidy. Recall how the bigger the Ploidy, the worse the cancer is.
+
+## **Final Graph 1 - DataType differences** ##
+
+### **Motivation**
+Even if the most "interesting" part in this project would be to see all the differences or similarities between the Tumors, Groups, Ages, etc. It is truly important to also consider, at least a bit, the Genomics side of the project as a Quality Check (Quality Control). In other words, if we do not demonstrate that all samples are equally good. We cannot perform a good further analysis.
+
+### **Hypothesis**
+We believe there should NOT be many differences in quality between DataType (RNA-Seq and WES), after all, what matters in these kind of analysis is the previous handling of the samples, which were performed all by the same team.
+
+### **Graph**
+````{r}
+# Select the QC-related variables
+data_plot <- data_clean %>%
+  select(DataType, Total_reads, `Mapped(%)`, MeanMappingQuality, `MeanTargetCoverage(MQ20)`) %>%
+  # Convert to long format for easy comparison
+  pivot_longer(
+    cols = -DataType,
+    names_to = "Metric",
+    values_to = "Value"
+  )
+
+# Boxplots to compare the results
+# Create annotation data frame with one row per facet
+rect_annotations <- data.frame(
+  Metric = c("Total_reads", "Mapped(%)", "MeanMappingQuality"),
+  #              WES box         WES box         WES box
+  xmin  = c(0.6,             -Inf,             0.5),
+  xmax  = c(2.4,             Inf,             2.5),
+  ymin  = c(0.0e+00,         99,              34),
+  ymax  = c(2.5e+08,         Inf,              36.5)
+)
+
+text_annotations <- data.frame(
+  Metric = "MeanMappingQuality",
+  x = 2.4,
+  y = 39.5,
+  label = "*See that the two types of sequencing don't display\nsignificant differences in metrics (only MQ20,\nwhich is characteristic from WES)."
+)
+
+ggplot(data_plot, aes(x = DataType, y = Value, fill = DataType)) +
+  geom_boxplot(outlier.alpha = 0.3) +
+  geom_rect(
+    data = rect_annotations,
+    aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+    inherit.aes = FALSE,
+    alpha = 0,
+    color = "orange",
+    linewidth = 0.8
+  ) +
+  scale_fill_brewer(aes(fill = DataType), palette = "Pastel1",  direction = -1) +
+  facet_wrap(~Metric, scales = "free_y") +
+  scale_y_facet(Metric == "MeanMappingQuality", limits = c(30, 40)) +
+  theme_minimal() +
+  labs(
+    title = "Comparison of Sequencing Metrics by DataType",
+    x = "DataType",
+    y = "Values",
+    fill = "DataType",
+    caption = "*See that the two types of sequencing don't display significant\ndifferences in metrics (only MQ20, which is characteristic from WES)."
+  ) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold"),
+    plot.caption = element_text(
+      color = "orange",
+      hjust = 0,
+      vjust = 0,
+      size = 8,
+      face = "italic",
+      margin = margin(t = 10)
+    )
+  ) 
+
+````
+
+### **Interpretation**
+
+With the exception of the MQ20 (which is only computed on the WES samples), the other indicators of quality of the samples are, first of all, extremely similar and, second of all, extremely good. Having amazing Mapped(%) and MeanMappingQuality. In the case of the Total Reads, although there are clear outliers, they both follow the same trend. So our hypothesis was quite right.
+
+
+## **Final Graph 2 - Most Prevalence Cancer Type per Age and Gender** ##
+
+### **Motivation**
+Even after analysing variables that are more centered on the form than on the content, we think it is of the utmost importance to extract significant clinical conclusions by graphical examination of more complex and insightful variables.
+
+In this case, we consider that finding out which cancers are most prevalent in each age group and sex is essential to characterise our dataset, so we are able to compare the empirical evidence of our selected study with the medical consensus.
+
+### **Hypothesis**
+Older age groups (60–74) will represent the peak prevalence bracket across most cancer types, with notable gender-specific differences in sex-linked cancers (e.g., breast, cervix, prostate, uterus) and some variation in younger age peaks for hormonally-driven cancers.
+
+### **Graph**
+```{r, fig.height = 6}
+
+data_clean %>%
+  filter(
+    !is.na(Age),
+    !is.na(CancerGroup),
+    !is.na(Gender),
+    Group == "Human_Tumor"
+  ) %>%
+  count(CancerGroup, Age, Gender) %>%
+  group_by(CancerGroup, Gender) %>%
+  slice_max(n, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  ggplot(aes(x = CancerGroup, y = Age, color = Gender, size = n, shape = Gender)) +
+  geom_point(alpha = 0.8) +
+  scale_color_manual(values = c("Female" = "#D490A3", "Male" = "#37348A")) +
+  scale_shape_manual(values = c("Female" = 17, "Male" = 16)) +
+  scale_size_continuous(range = c(3, 10), name = "No. of entries") +
+  scale_y_discrete(drop = FALSE, expand = expansion(add = 0.4)) +
+  labs(
+    title = "Most Prevalent Age Group per Cancer Type - Human Tumor models",
+    x = "Cancer Group", y = "Peak Age Bracket", color = "Gender", shape = "Gender"
+  ) +
+  annotate("rect", xmin = 0, xmax = 17, ymin = 5, ymax = 13, alpha = 0.15, fill = '#FFA756') +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "top"
+  )
+
+```
+
+### **Interpretation**
+
+The majority of cancer types peak in the 65–74 age bracket for both males and females. Colon, Head & Neck, Kidney, Lung, and Pancreas all cluster here, consistent with our hypothesis and with our knowledge of accumulation of DNA damage through life.
+Prostate (male-only) peaks at 60–70, and Uterus/Cervix (female-only) show expected sex-linked patterns.
+
+
+Breast cancer peaks unexpectedly early at 45–49, with one of the largest dot sizes, which suggests high study representation of premenopausal or early postmenopausal women in these tumor models. This can also be an indicator of good change in practice, screening for these types of cancers earlier than it was used to.
+
+To follow up, other(GYN) shows a very young female peak around 25–29, possibly reflecting rare gynecological malignancies like germ cell tumors, those being more common in younger women. 
+
+We can conclude that while aging is the dominant risk factor across most cancers, hormonal and reproductive cancers display different behaviour. It is also clear that starting from 45-49, more cancer cases are registered, which is clearly seen in the graph.
+
+## **Final Graph 3 - Ploidy / Cancer Group by Group (Human Tumor and PDX)**
+
+### **Motivation**
+
+We have just focused on variables regarding the Human_Tumor group, which is the main one, although the paper focuses also on PDX. Hence, something we could check is if there's actually any difference between the Cancer Groups + Ploidy and if the cells are from the Human itself or the Xenograph. 
+
+### **Hypothesis**
+We believe there should NOT be many differences of Ploidy + Cancer Groups between Human and PDX. After all, the PDX was originally obtained from those humans (then implanted into mice), so it makes sense they have the same Ploidy.
+
+### **Graph**
+````{r, WARNING = FALSE, message = FALSE}
+# We will ONLY use those PDX patients that intersect with Human_Tumor (that is, all Human_Tumor patients)
+
+# We obtained all those rows (unique) from Human_Tumor
+human_tumor_data <- data %>%
+  filter(Group == "Human_Tumor") %>%
+  distinct(Formal_CaseID, .keep_all = TRUE)  # one row per patient
+
+# We obtained all those rows (unique) from PDX BUT filtering that they must be with the same Patient ID than Human_Tumor
+pdx_data <- data %>%
+  filter(Group == "PDX", Formal_CaseID %in% human_tumor_data$Formal_CaseID) %>%
+  distinct(Formal_CaseID, .keep_all = TRUE)
+
+# We combine them
+combined_data <- bind_rows(human_tumor_data, pdx_data)
+
+# We compute the mean of the ploidy (this will be useful to write the value inside each heatmap cell)
+heatmap_data <- combined_data %>%
+  group_by(Group, CancerGroup) %>%
+  summarise(Ploidy_value = mean(Ploidy, na.rm = TRUE), .groups = "drop")
+
+order_levels <- heatmap_data %>%
+  filter(Group == "Human_Tumor") %>%
+  arrange(Ploidy_value) %>%
+  pull(CancerGroup)
+
+heatmap_data$CancerGroup <- factor(heatmap_data$CancerGroup, levels = order_levels)
+
+# We annotate the plot to highlight specific cancer groups
+highlight_cancers <- c("Ovary", "Prostate", "Other(GYN)", "Other(GI)")
+
+y_levels <- sort(unique(heatmap_data$CancerGroup))
+y_colors <- ifelse(y_levels %in% highlight_cancers, "red", "black")
+
+# We perform the heatmap
+ggplot(heatmap_data, aes(x = Group, y = CancerGroup, fill = Ploidy_value)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = round(Ploidy_value, 1)), color = "black", size = 4) +
+  scale_fill_viridis_c(option = "C") +
+  theme_minimal() +
+  labs(title = "Heatmap: Ploidy by Cancer Group and Human/PDX",
+       x = "Group",
+       y = "Cancer Group",
+       fill = "Ploidy") +
+  theme(plot.title = element_text(face = "bold", hjust = -1),
+        axis.text.y = element_text(colour = y_colors))
+
+````
+
+### **Interpretation**
+As we can see, in general, most of the Cancer Groups follow the same ploidy between Human_Tumor and PDX samples. Although there are some cases like Ovary, Other(GI and GYN) or Prostate where the differences are sharper. 
+
+Nevertheless, there's a small tendency of "decay" in Ploidy in PDX. We could interpret that when the Xenograph is created, due to the new environment, the Tumor is not as "dangerous" as it initially was in the Human.
+
+
+
